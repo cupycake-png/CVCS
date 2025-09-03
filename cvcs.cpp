@@ -40,7 +40,7 @@ int initialise(std::string directory){
     try{
         for(auto file : std::filesystem::directory_iterator(directory)){
             std::filesystem::path path = file.path();
-            std::string fileName = path.filename();
+            std::string fileName = path.filename().string();
 
             if(fileName == ".cupy"){
                 throw -7;
@@ -94,7 +94,7 @@ int getLastSaveID(){
     int lastID = -1;
 
     for(auto file : std::filesystem::directory_iterator(std::filesystem::current_path().string() + "/.cupy/saves")){
-        std::string fileName = file.path().filename();
+        std::string fileName = file.path().filename().string();
 
         try{
             int saveID = std::stoi(fileName);
@@ -235,6 +235,7 @@ bool hasFileChanged(std::string fileName){
                     while(std::getline(file, line)){
                         content += line + "\n";
                     }
+                    content.pop_back();
 
                     newHash = md5(content);
                 
@@ -490,10 +491,10 @@ void viewChanges(int saveID){
 // TODO: STOP ANYTHING WORKING IF .cupy ISN'T FOUND
 // TODO: deletions aren't saved in the changes file
 // TODO: history command "v" gives most recent changes rather than changes in that save
-// TODO: get rid of md5 dependency
+// TODO: get rid of md5 dependency (maybe try easier hashing algorithm?)
 // TODO: make status show actual changes
-// TODO: make save check status for changes
-// TODO: status says everything has changed all the time, hasFileChanged is broken
+// TODO: upload command to upload to a server like github fr fr
+// TODO: rollback do NAWT work
 
 int main(int argc, char* argv[]){
     if(argc <= 1){
@@ -648,11 +649,11 @@ int main(int argc, char* argv[]){
         }
 
         // Save current state
-        std::string cwd = std::filesystem::current_path();
+        std::string cwd = std::filesystem::current_path().string();
 
         for(auto file : std::filesystem::directory_iterator(cwd)){
             std::filesystem::path path = file.path();
-            std::string fileName = path.filename();
+            std::string fileName = path.filename().string();
 
             if(fileName == ".cupy"){
                 std::string saveMessage = (argc == 2) ? "No message provided" : argv[2];
