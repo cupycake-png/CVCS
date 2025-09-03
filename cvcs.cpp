@@ -495,6 +495,7 @@ void viewChanges(int saveID){
 // TODO: make status show actual changes
 // TODO: upload command to upload to a server like github fr fr
 // TODO: rollback do NAWT work
+// TODO: update diff algorithm to use Myer's Diff
 
 int main(int argc, char* argv[]){
     if(argc <= 1){
