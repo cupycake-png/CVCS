@@ -5,7 +5,6 @@
 #include <fstream>
 #include <algorithm>
 #include <cctype>
-#include <ctime>
 #include <set>
 #include <unordered_map>
 
@@ -24,12 +23,6 @@
 
 #define SERVER_IP "192.168.160.128"
 #define SERVER_PORT 2956
-
-// Struct for storing the changes made to a file
-struct Change{
-    int lineNum;
-    std::string lineContent;
-};
 
 // General logging functions
 template <typename T>
@@ -95,7 +88,7 @@ int initialise(std::string directory){
 
 // Function for getting the ID of the last save
 int getLastSaveID(){
-    int lastID = -1;
+    int maxID = -1;
 
     // Iterate over the saves directory
     for(auto file : std::filesystem::directory_iterator(std::filesystem::current_path().string() + "/.cupy/saves")){
@@ -103,22 +96,13 @@ int getLastSaveID(){
 
         try{
             int saveID = std::stoi(fileName);
-            // Always take the maximum value (the last one is the biggest)
-            lastID = std::max(lastID, saveID);
-        }catch(std::invalid_argument& e){
+            maxID = std::max(maxID, saveID);
+        }catch(std::invalid_argument e){
             // Ignore non-integer filenames
         }
     }
 
-    return lastID;
-}
-
-// Function for getting the current date and time as a string
-std::string getDateTime(){
-    time_t ts;
-    time(&ts);
-
-    return ctime(&ts);
+    return maxID;
 }
 
 // Function for getting all the current tracked files
@@ -223,100 +207,14 @@ void ignoreFileFromTracking(std::string filePath){
     trackFile.close();
 
     std::ofstream trackFileOut(".cupy/.track");
-    for(auto trackedFile : trackedFiles){
+    
+    for(std::string trackedFile : trackedFiles){
         trackFileOut << trackedFile << std::endl;
     }
+    
+    trackFileOut.close();
 
     log(filePath + " ignored from tracking");
-}
-
-// Function for checking if a file has changed from previous save
-// filePath -> path to file that is being checked
-bool hasFileChanged(std::string filePath){
-    std::string oldHash = "";
-    std::string newHash = "";
-
-    // Sort directories first to keep oldHash finding updated to the most recent hash
-    std::vector<std::filesystem::__cxx11::directory_entry> directoryEntries;
-
-    for(auto saveDir : std::filesystem::directory_iterator(".cupy/saves/")){
-        directoryEntries.push_back(saveDir);
-    }
-
-    // Sort according to the filename of the path, which is the save ID (otherwise would be lexographically)
-    std::sort(directoryEntries.begin(), directoryEntries.end(), [](std::filesystem::__cxx11::directory_entry a, std::filesystem::__cxx11::directory_entry b){
-        return std::stoi(a.path().filename().string()) < std::stoi(b.path().filename().string());
-    });
-
-    // Iterate over all change files in order
-    for(auto saveDir : directoryEntries){
-        std::string changesFilePath = saveDir.path().string() + "/.changes";
-
-        if(doesFileExist(changesFilePath)){
-            std::ifstream changesFile(changesFilePath);
-
-            // Get the most updated hash
-            std::string line;
-            while(std::getline(changesFile, line)){
-                if(line == '[' + filePath){
-                    std::getline(changesFile, oldHash);                
-                }
-            }
-
-            changesFile.close();
-        }
-    }
-
-    // Read file (TODO: TURN INTO SEPARATE FUNCTION FOR READING FILES)
-    std::ifstream file(filePath);
-
-    std::string content;
-    std::string line;
-    while(std::getline(file, line)){
-        content += line + "\n";
-    }
-
-    file.close();
-
-    if(content != ""){
-        content.pop_back();
-    }
-
-    if(content == ""){
-        // Hash of an empty string
-        newHash = "d41d8cd98f00b204e9800998ecf8427e";
-    }else{
-        // Calculate new hash
-        newHash = md5(content);
-    }
-
-    // TODO: COMMENT THIS PLEASE IDEK WHAT ITS DOING
-    if(oldHash != newHash && oldHash != ""){
-        return true;
-    }
-
-    if(oldHash == "" && newHash != ""){
-        return true;
-    }
-
-    return false;
-}
-
-// Function for reconstructing strings that have been split by newlines
-// splitString -> the vector of strings to be reconstructed
-std::string reconstructSplitString(std::vector<std::string> splitString){
-    std::string reconstructed = "";
-
-    for(std::string line : splitString){
-        reconstructed += line + "\n";
-    }
-
-    if(reconstructed.size() > 0){
-        // Remove extra newline
-        reconstructed.pop_back();
-    }
-
-    return reconstructed;
 }
 
 // Function for rebuilding an old version of a file
@@ -344,7 +242,7 @@ std::string rebuildOldFile(std::string filePath, int saveIDFinal){
         return std::stoi(a.path().filename().string()) < std::stoi(b.path().filename().string());
     });
 
-    // Iterate over the save directories
+    // Iterate over the save directories in order
     for(auto saveDir : directoryEntries){
         // If we have gone past the saveIDFinal, break
         if(saveDir.path().string() == ".cupy/saves/" + std::to_string(saveIDFinal + 1)){
@@ -405,6 +303,78 @@ std::string rebuildOldFile(std::string filePath, int saveIDFinal){
     std::string oldFileUpdated = reconstructSplitString(oldFileSplit);
 
     return oldFileUpdated;
+}
+
+// Function for checking if a file has changed from previous save
+// filePath -> path to file that is being checked
+bool hasFileChanged(std::string filePath){
+    std::string oldHash = "";
+    std::string newHash = "";
+
+    // Sort directories first to keep oldHash finding updated to the most recent hash
+    std::vector<std::filesystem::__cxx11::directory_entry> directoryEntries;
+
+    for(auto saveDir : std::filesystem::directory_iterator(".cupy/saves/")){
+        directoryEntries.push_back(saveDir);
+    }
+
+    // Sort according to the filename of the path, which is the save ID (otherwise would be lexographically)
+    std::sort(directoryEntries.begin(), directoryEntries.end(), [](std::filesystem::__cxx11::directory_entry a, std::filesystem::__cxx11::directory_entry b){
+        return std::stoi(a.path().filename().string()) < std::stoi(b.path().filename().string());
+    });
+
+    // Iterate over all change files in order
+    for(auto saveDir : directoryEntries){
+        std::string changesFilePath = saveDir.path().string() + "/.changes";
+
+        if(doesFileExist(changesFilePath)){
+            std::ifstream changesFile(changesFilePath);
+
+            // Get the most updated hash
+            std::string line;
+            while(std::getline(changesFile, line)){
+                if(line == '[' + filePath){
+                    std::getline(changesFile, oldHash);
+                    break;                
+                }
+            }
+
+            changesFile.close();
+        }
+    }
+
+    // Read file
+    std::ifstream file(filePath);
+
+    std::string content;
+    std::string line;
+    while(std::getline(file, line)){
+        content += line + "\n";
+    }
+
+    file.close();
+
+    if(content != ""){
+        content.pop_back();
+    }
+
+    if(content == ""){
+        // Hash of an empty string
+        newHash = "d41d8cd98f00b204e9800998ecf8427e";
+    }else{
+        // Calculate new hash
+        newHash = md5(content);
+    }
+
+    if(oldHash != newHash && oldHash != ""){
+        return true;
+    }
+
+    if(oldHash == "" && newHash != ""){
+        return true;
+    }
+
+    return false;
 }
 
 // Function for checking if a certain file has a beginning save entry
@@ -545,27 +515,34 @@ sockaddr_in getServerAddress(){
 }
 
 // Function for uploading files to the server
-int upload(int clientSocket, std::string projectName, std::string filePath){
-    log("Uploading " + filePath + " from project " + projectName);
-
+int upload(int clientSocket, std::string projectName, std::vector<std::string> filePaths, std::string saveMessage){
     sendMessage(clientSocket, "upload");
     sendMessage(clientSocket, projectName);
-    sendMessage(clientSocket, filePath);
+    sendMessage(clientSocket, std::to_string(filePaths.size()));
+    sendMessage(clientSocket, saveMessage);
 
-    // Read file
-    std::string content;
-    std::ifstream file(filePath);
-    
-    std::string line;
-    while(std::getline(file, line)){
-        content += line + '\n';
+    log("Uploading files from projectName");
+
+    for(std::string filePath : filePaths){
+        log("Uploading " + filePath);
+
+        sendMessage(clientSocket, filePath);
+
+        // Read file
+        std::string content;
+        std::ifstream file(filePath);
+        
+        std::string line;
+        while(std::getline(file, line)){
+            content += line + '\n';
+        }
+        content.pop_back();
+
+        file.close();
+
+        // Send over file contents
+        sendMessage(clientSocket, content);
     }
-    content.pop_back();
-
-    file.close();
-
-    // Send over file contents
-    sendMessage(clientSocket, content);
 
     return 0;
 }
@@ -613,7 +590,7 @@ int download(std::string projectName){
 }
 
 std::string getProjectName(){
-    std::ifstream projectFile(".cupy/project");
+    std::ifstream projectFile(".cupy/.project");
 
     std::string projectName;
     std::getline(projectFile, projectName);
@@ -635,8 +612,11 @@ int main(int argc, char* argv[]){
     }
 
     if(argc <= 1){
-        error("Not enough arguments passed. Usage:\ncvcs init <directory>\ncvcs save <message?>\ncvcs add <filename>\ncvcs ignore <filename>\ncvcs rollback <saveID>\ncvcs obliterate <saveID>\ncvcs history\ncvcs upload <filename?>\ncvcs download <projectname?>");
+        error("Not enough arguments passed. Usage:\ncvcs init <directory>\ncvcs save <message>?\ncvcs add <filename>\ncvcs ignore <filename>\ncvcs rollback <saveID>\ncvcs obliterate <saveID>\ncvcs history\ncvcs upload <filenames>? @<message>@?\ncvcs download <projectname?>");
         return -1;
+
+    }else if(std::string(argv[1]) == "help"){
+        log("Usage:\ncvcs init <directory>\ncvcs save <message>?\ncvcs add <filename>\ncvcs ignore <filename>\ncvcs rollback <saveID>\ncvcs obliterate <saveID>\ncvcs history\ncvcs upload <filenames>? @<message>@?\ncvcs download <projectname?>");
 
     }else if(std::string(argv[1]) == "history" && argc == 2){
         // View history
@@ -808,11 +788,43 @@ int main(int argc, char* argv[]){
         
         std::vector<std::string> trackedFiles = getTrackedFiles();
 
-        for(std::string trackedFile : trackedFiles){
-            upload(clientSocket, projectName, trackedFile);
+        upload(clientSocket, projectName, trackedFiles, "");
+
+    }else if(std::string(argv[1]) == "upload" && argc == 3){
+        // Either "cvcs upload <filename>" or "cvcs upload <message>" has been ran
+
+        if(!isInitialised()){
+            error("cvcs not initialised!");
+            return -11;
         }
 
-    }else if(std::string(argv[1]) == "upload" && argc >= 3){
+        std::string argument = std::string(argv[2]);
+
+        std::string projectName = getProjectName();
+
+        int clientSocket = socket(AF_INET, SOCK_STREAM, 0);
+    
+        sockaddr_in serverAddress = getServerAddress();
+
+        connect(clientSocket, (struct sockaddr*)&serverAddress, sizeof(serverAddress));
+
+        if(argument[0] == '@' && argument[argument.length()-1] == '@'){
+            // It's a string, so must be the message
+
+            argument = argument.substr(1).substr(0, argument.length()-2);
+
+            std::vector<std::string> trackedFiles = getTrackedFiles();
+
+            upload(clientSocket, projectName, trackedFiles, argument);
+
+        }else{
+            // Must be the file name
+            std::vector<std::string> files = {argument};
+
+            upload(clientSocket, projectName, files, "No message provided");
+        }
+
+    }else if(std::string(argv[1]) == "upload" && argc > 3){
         // Upload specified files onto server (server does diff processing)
 
         if(!isInitialised()){
@@ -830,8 +842,26 @@ int main(int argc, char* argv[]){
 
         // Iterate over argv and pass each file to upload function
 
+        std::vector<std::string> files;
+
         for(int i=2; i<argc; i++){
-            upload(clientSocket, projectName, std::filesystem::current_path().string() + "/" + argv[i]);
+            files.push_back(std::string(argv[i]));
+        }
+
+        if(files[argc-3][0] == '@' && files[argc-3][files[argc-3].length()-1] == '@'){
+            // User included a message
+
+            // Get the message
+            std::string message = files[files.size()-1].substr(1).substr(0, files[files.size()-1].length()-2);
+
+            // Remove the message from the files
+            files.pop_back();
+
+            upload(clientSocket, projectName, files, message);
+        }else{
+            // User did not include a message
+
+            upload(clientSocket, projectName, files, "No message provided");
         }
 
     }else if(std::string(argv[1]) == "download" && argc == 2){
@@ -851,7 +881,7 @@ int main(int argc, char* argv[]){
     }else if(std::string(argv[1]) == "download" && argc == 3){
         // Download stored files for specified project (argv[2])
 
-        error("Not yet implemented!! :c");
+        error("Not yet implemented!!");
 
     }else if(std::string(argv[1]) == "status"){
         // Show status of tracked files
@@ -956,94 +986,84 @@ int main(int argc, char* argv[]){
             std::filesystem::path path = file.path();
             std::string fileName = path.filename().string();
 
-            if(fileName == ".cupy"){
-                std::string saveMessage = (argc == 2) ? "No message provided" : argv[2];
-                int saveID = getLastSaveID() + 1;
+            std::string saveMessage = (argc == 2) ? "No message provided" : argv[2];
+            int saveID = getLastSaveID() + 1;
 
-                // Create new directory and files for the current save
-                std::filesystem::create_directory(cwd + "/.cupy/saves/" + std::to_string(saveID));
-                std::ofstream saveFile(cwd + "/.cupy/saves/" + std::to_string(saveID) + "/.save");
-                std::ofstream changesFile(cwd + "/.cupy/saves/" + std::to_string(saveID) + "/.changes");
+            // Create new directory and files for the current save
+            std::filesystem::create_directory(cwd + "/.cupy/saves/" + std::to_string(saveID));
+            std::ofstream changesFile(cwd + "/.cupy/saves/" + std::to_string(saveID) + "/.changes");
+            std::ofstream saveFile(cwd + "/.cupy/saves/" + std::to_string(saveID) + "/.save");
 
-                saveFile << getDateTime();
-                saveFile << saveMessage;
-                saveFile.close();
+            saveFile << getDateTime();
+            saveFile << saveMessage;
                 
-                for(std::string trackedFile : getTrackedFiles()){
-                    std::ifstream trackedFileStream(trackedFile);
-                    std::vector<std::string> content;
+            saveFile.close();
+                
+            for(std::string trackedFile : getTrackedFiles()){
+                std::ifstream trackedFileStream(trackedFile);
+                std::vector<std::string> content;
 
-                    // Store the current content of the file
-                    std::string line;
-                    while(std::getline(trackedFileStream, line)){
-                        content.push_back(line);
-                    }
-
-                    trackedFileStream.close();
-
-                    if(hasFileChanged(trackedFile)){
-                        log("File has been changed: " + trackedFile);
-                        // Store the path and hash of the file
-                        changesFile << '[' << trackedFile << std::endl;
-
-                        std::string reconstructedString = reconstructSplitString(content);
-                        if(reconstructedString != ""){
-                            changesFile << md5(reconstructedString) << std::endl;
-                        }else{
-                            // Hash of an empty string
-                            changesFile << "d41d8cd98f00b204e9800998ecf8427e" << std::endl;
-                        }
-
-                        // Get the changes from previous save
-                        std::string oldContent = rebuildOldFile(trackedFile, getLastSaveID()-1);
-
-                        std::vector<std::string> changes = getChanges(oldContent, reconstructSplitString(content));
-
-                        for(std::string change : changes){
-                            changesFile << change << std::endl;
-
-                            int counter = change.find_first_of(':');
-
-                            int lineNum = std::stoi(change.substr(0, counter+1));
-
-                            std::string newLine = change.substr(counter+1);
-
-                            log("[" + trackedFile + "]" + std::to_string(lineNum) + " => " + newLine);
-
-                            if(lineNum > content.size()){
-                                content.resize(lineNum);
-                            }
-
-                            content[lineNum-1] = newLine;
-                        }
-
-                        if(changes.size() >= 1){
-                            log(" ");
-                        }
-
-                        changesFile << "--------------------" << std::endl;
-
-                    // If there's no changes, and the file has never been saved before, save it
-                    }else if(hasNoFullEntry(trackedFile)){
-                        changesFile << trackedFile << std::endl;
-                        changesFile << md5(reconstructSplitString(content)) << std::endl;
-                        changesFile << reconstructSplitString(content) << std::endl;
-                        changesFile << "--------------------" << std::endl;                    
-                    }
+                // Get the current content of the file
+                std::string line;
+                while(std::getline(trackedFileStream, line)){
+                    content.push_back(line);
                 }
 
-                changesFile.close();
+                trackedFileStream.close();
 
-                log("Saved successfully");
+                if(hasFileChanged(trackedFile)){
+                    log("File has been changed: " + trackedFile);
+                    // Store the path and hash of the file
+                    changesFile << '[' << trackedFile << std::endl;
 
-                return 0;
+                    std::string reconstructedString = reconstructSplitString(content);
+                    if(reconstructedString != ""){
+                        changesFile << md5(reconstructedString) << std::endl;
+                    }else{
+                        // Hash of an empty string
+                        changesFile << "d41d8cd98f00b204e9800998ecf8427e" << std::endl;
+                    }
+
+                    // Get the changes from previous save
+                    std::string oldContent = rebuildOldFile(trackedFile, getLastSaveID()-1);
+
+                    std::vector<std::string> changes = getChanges(oldContent, reconstructSplitString(content));
+
+                    for(std::string change : changes){
+                        changesFile << change << std::endl;
+
+                        int splitPos = change.find_first_of(':');
+
+                        int lineNum = std::stoi(change.substr(0, splitPos+1));
+
+                        std::string newLine = change.substr(splitPos+1);
+
+                        log("[" + trackedFile + "]" + std::to_string(lineNum) + " => " + newLine);
+                    }
+
+                    if(changes.size() >= 1){
+                        log(" ");
+                    }
+
+                    changesFile << "--------------------" << std::endl;
+
+                // If there's no changes, and the file has never been saved before, save it
+                }else if(hasNoFullEntry(trackedFile)){
+                    changesFile << '[' << trackedFile << std::endl;
+                    changesFile << md5(reconstructSplitString(content)) << std::endl;
+                    changesFile << reconstructSplitString(content) << std::endl;
+                    changesFile << "--------------------" << std::endl;                    
+                
+                }
             }
+
+            changesFile.close();
+
+            log("Saved successfully");
+
+            return 0;
         }
-
-        error("No .cupy directory found");
-
-        return -8;
-    
+            
     }else if(std::string(argv[1]) == "init" && argc == 3){
         // Initialise
         
@@ -1063,7 +1083,7 @@ int main(int argc, char* argv[]){
         int splitPos = directoryPath.find_last_of('/');
         projectName = directoryPath.substr(splitPos+1);
 
-        std::ofstream projectFile(directoryPath + "/.cupy/project");
+        std::ofstream projectFile(directoryPath + "/.cupy/.project");
         projectFile << projectName;
         projectFile.close();
 
@@ -1072,7 +1092,7 @@ int main(int argc, char* argv[]){
         return 0;
 
     }else{
-        error("Not enough arguments passed. Usage:\ncvcs init <directory>\ncvcs save <message?>\ncvcs add <filename>\ncvcs ignore <filename>\ncvcs rollback <saveID>\ncvcs obliterate <saveID>\ncvcs history\ncvcs upload <filename?>\ncvcs download <projectname?>");
+        error("Invalid arguments passed. Usage:\ncvcs init <directory>\ncvcs save <message>?\ncvcs add <filename>\ncvcs ignore <filename>\ncvcs rollback <saveID>\ncvcs obliterate <saveID>\ncvcs history\ncvcs upload <filenames>? @<message>@?\ncvcs download <projectname?>");
         return -2;
     }
 

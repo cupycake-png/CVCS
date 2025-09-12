@@ -1,7 +1,32 @@
 #include <sstream>
 #include <filesystem>
+#include <ctime>
+#include <algorithm>
+#include <fstream>
 
 #include "utils.h"
+
+std::string getDateTime(){
+    time_t ts;
+    time(&ts);
+
+    return ctime(&ts);
+}
+
+std::string reconstructSplitString(std::vector<std::string> splitString){
+    std::string reconstructed = "";
+
+    for(std::string line : splitString){
+        reconstructed += line + "\n";
+    }
+
+    if(reconstructed.size() > 0){
+        // Remove extra newline
+        reconstructed.pop_back();
+    }
+
+    return reconstructed;
+}
 
 bool doesFileExist(std::string filePath){
     return std::filesystem::exists(filePath);
