@@ -51,7 +51,13 @@ SocketType connectToServer(std::string serverAddress, int port){
         throw std::runtime_error("Invalid server address: " + serverAddress);
     }
 
-    connect(retSocket, reinterpret_cast<sockaddr*>(&serverAddr), sizeof(serverAddr));
+    int err = connect(retSocket, reinterpret_cast<sockaddr*>(&serverAddr), sizeof(serverAddr));
+
+    if(err != 0){
+        closeSocket(retSocket);
+
+        throw std::runtime_error("Cannot connect to server");
+    }
 
     return retSocket;
 }

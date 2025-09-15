@@ -388,11 +388,16 @@ int main(int argc, char* argv[]){
         // Search for project and send over all project files
     
     }else if(command == "list"){
-        // dummy for now
-        sendMessage(clientSocketFD, "3");
-        sendMessage(clientSocketFD, "project1");
-        sendMessage(clientSocketFD, "project2");
-        sendMessage(clientSocketFD, "project3");
+        std::vector<std::string> projects;
+        for(auto filePath : std::filesystem::directory_iterator(std::filesystem::current_path())){
+            projects.push_back(filePath.path().filename().string());
+        }
+
+        sendMessage(clientSocketFD, projects.size());
+        
+        for(std::string project : projects){
+            sendMessage(clientSocketFD, project);
+        }
     }
 
     close(serverSocketFD);

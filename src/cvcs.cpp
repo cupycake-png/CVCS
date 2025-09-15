@@ -12,10 +12,11 @@
 #include "networkUtils.h"
 #include "utils.h"
 
-#define SERVER_IP "192.168.160.128"
+#define SERVER_IP "127.0.0.1"
 #define SERVER_PORT 2956
 
 // General logging functions
+
 template <typename T>
 void error(T errMessage){
     std::cout << "[-] " << errMessage << std::endl;
@@ -494,17 +495,6 @@ bool isInitialised(){
     return false;
 }
 
-// // Function for getting the address of the server
-// sockaddr_in getServerAddress(){
-//     sockaddr_in serverAddress;
-
-//     serverAddress.sin_family = AF_INET;
-//     serverAddress.sin_port = htons(SERVER_PORT);
-//     inet_pton(AF_INET, SERVER_IP, &serverAddress.sin_addr);
-
-//     return serverAddress;
-// }
-
 // Function for uploading files to the server
 int upload(int clientSocket, std::string projectName, std::vector<std::string> filePaths, std::string saveMessage){
     sendMessage(clientSocket, "upload");
@@ -866,7 +856,6 @@ int main(int argc, char* argv[]){
         std::vector<std::string> projectNames = getProjectNames();
 
         if(projectNames.size() > 0){
-            // let user choose between projects
             for(std::string projectName : projectNames){
                 log(projectName);
             }
@@ -1074,7 +1063,12 @@ int main(int argc, char* argv[]){
             directoryPath = std::filesystem::current_path().string();
         }
 
-        int splitPos = directoryPath.find_last_of('/');
+        #ifdef _WIN32
+            int splitPos = directoryPath.find_last_of('\\');
+        #else
+            int splitPos = directoryPath.find_last_of('/');
+        #endif
+        
         projectName = directoryPath.substr(splitPos+1);
 
         std::ofstream projectFile(directoryPath + "/.cupy/.project");
