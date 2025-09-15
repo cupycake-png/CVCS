@@ -8,9 +8,9 @@
 #include <set>
 #include <unordered_map>
 
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
+// #include <sys/socket.h>
+// #include <netinet/in.h>
+// #include <arpa/inet.h>
 
 #include "md5.h"
 #include "networkUtils.h"
@@ -23,6 +23,8 @@
 
 #define SERVER_IP "192.168.160.128"
 #define SERVER_PORT 2956
+
+// TODO: add status to help message
 
 // General logging functions
 template <typename T>
@@ -503,16 +505,16 @@ bool isInitialised(){
     return false;
 }
 
-// Function for getting the address of the server
-sockaddr_in getServerAddress(){
-    sockaddr_in serverAddress;
+// // Function for getting the address of the server
+// sockaddr_in getServerAddress(){
+//     sockaddr_in serverAddress;
 
-    serverAddress.sin_family = AF_INET;
-    serverAddress.sin_port = htons(SERVER_PORT);
-    inet_pton(AF_INET, SERVER_IP, &serverAddress.sin_addr);
+//     serverAddress.sin_family = AF_INET;
+//     serverAddress.sin_port = htons(SERVER_PORT);
+//     inet_pton(AF_INET, SERVER_IP, &serverAddress.sin_addr);
 
-    return serverAddress;
-}
+//     return serverAddress;
+// }
 
 // Function for uploading files to the server
 int upload(int clientSocket, std::string projectName, std::vector<std::string> filePaths, std::string saveMessage){
@@ -550,11 +552,10 @@ int upload(int clientSocket, std::string projectName, std::vector<std::string> f
 // Function for getting all project names from the server
 std::vector<std::string> getProjectNames(){
     // Ask server for list of project names
-    int clientSocket = socket(AF_INET, SOCK_STREAM, 0);
-    
-    sockaddr_in serverAddress = getServerAddress();
 
-    connect(clientSocket, (struct sockaddr*)&serverAddress, sizeof(serverAddress));
+    initialiseSockets();
+
+    SocketType clientSocket = connectToServer(SERVER_IP, SERVER_PORT);
 
     log("Requesting project names...");
 
@@ -572,21 +573,23 @@ std::vector<std::string> getProjectNames(){
         projectNames.push_back(projectName);
     }
 
+    closeSocket(clientSocket);
+
     return projectNames;
 }
 
 // Function for downloading a certain project
 int download(std::string projectName){
-    int clientSocket = socket(AF_INET, SOCK_STREAM, 0);
-    
-    sockaddr_in serverAddress = getServerAddress();
+    initialiseSockets();
 
-    connect(clientSocket, (struct sockaddr*)&serverAddress, sizeof(serverAddress));
+    SocketType clientSocket = connectToServer(SERVER_IP, SERVER_PORT);
 
     log("Downloading project " + projectName);
 
     sendMessage(clientSocket, "download");
     sendMessage(clientSocket, projectName);
+
+    closeSocket(clientSocket);
 }
 
 std::string getProjectName(){
@@ -778,17 +781,17 @@ int main(int argc, char* argv[]){
 
         std::string projectName = getProjectName();
 
-        int clientSocket = socket(AF_INET, SOCK_STREAM, 0);
-    
-        sockaddr_in serverAddress = getServerAddress();
+        initialiseSockets();
 
-        connect(clientSocket, (struct sockaddr*)&serverAddress, sizeof(serverAddress));
+        SocketType clientSocket = connectToServer(SERVER_IP, SERVER_PORT);
 
         // Iterate over tracked files and pass each file to upload function
         
         std::vector<std::string> trackedFiles = getTrackedFiles();
 
         upload(clientSocket, projectName, trackedFiles, "");
+
+        closeSocket(clientSocket);
 
     }else if(std::string(argv[1]) == "upload" && argc == 3){
         // Either "cvcs upload <filename>" or "cvcs upload <message>" has been ran
@@ -802,11 +805,9 @@ int main(int argc, char* argv[]){
 
         std::string projectName = getProjectName();
 
-        int clientSocket = socket(AF_INET, SOCK_STREAM, 0);
-    
-        sockaddr_in serverAddress = getServerAddress();
+        initialiseSockets();
 
-        connect(clientSocket, (struct sockaddr*)&serverAddress, sizeof(serverAddress));
+        SocketType clientSocket = connectToServer(SERVER_IP, SERVER_PORT);
 
         if(argument[0] == '@' && argument[argument.length()-1] == '@'){
             // It's a string, so must be the message
@@ -824,6 +825,8 @@ int main(int argc, char* argv[]){
             upload(clientSocket, projectName, files, "No message provided");
         }
 
+        closeSocket(clientSocket);
+
     }else if(std::string(argv[1]) == "upload" && argc > 3){
         // Upload specified files onto server (server does diff processing)
 
@@ -834,11 +837,9 @@ int main(int argc, char* argv[]){
 
         std::string projectName = getProjectName();
 
-        int clientSocket = socket(AF_INET, SOCK_STREAM, 0);
-    
-        sockaddr_in serverAddress = getServerAddress();
+        initialiseSockets();
 
-        connect(clientSocket, (struct sockaddr*)&serverAddress, sizeof(serverAddress));
+        SocketType clientSocket = connectToServer(SERVER_IP, SERVER_PORT);
 
         // Iterate over argv and pass each file to upload function
 
@@ -863,6 +864,8 @@ int main(int argc, char* argv[]){
 
             upload(clientSocket, projectName, files, "No message provided");
         }
+
+        closeSocket(clientSocket);
 
     }else if(std::string(argv[1]) == "download" && argc == 2){
         // Get project names and let user choose which one to download

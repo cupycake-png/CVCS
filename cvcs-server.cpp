@@ -11,6 +11,10 @@
 #include "utils.h"
 #include "md5.h"
 
+// TODO: 1) check local files still work
+//       2) check that uploading fully works
+//       3) get downloading sorted (cvcs download <projectName> <saveID>?)
+
 // General logging functions
 
 template <typename T>
