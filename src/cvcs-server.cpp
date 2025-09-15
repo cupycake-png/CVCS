@@ -11,9 +11,7 @@
 #include "utils.h"
 #include "md5.h"
 
-// TODO: 1) check local files still work
-//       2) check that uploading fully works
-//       3) get downloading sorted (cvcs download <projectName> <saveID>?)
+#define SERVER_PORT 2956
 
 // General logging functions
 
@@ -27,6 +25,9 @@ void log(T message){
     std::cout << "[!] " << message << std::endl;
 }
 
+// Function for converting uploaded file path to a local project path
+// projectName -> name of the project that the file is a part of
+// filePath -> path to the file on the client's system
 std::string convertToServerPath(std::string projectName, std::string filePath) {
     std::stringstream ss(filePath);
     std::string currentSplit;
@@ -274,14 +275,14 @@ int main(int argc, char* argv[]){
 
     sockaddr_in serverAddress;
     serverAddress.sin_family = AF_INET;
-    serverAddress.sin_port = htons(2956);
+    serverAddress.sin_port = htons(SERVER_PORT);
     inet_pton(AF_INET, ip, &serverAddress.sin_addr);
 
     bind(serverSocketFD, (struct sockaddr*)&serverAddress, sizeof(serverAddress));
 
     listen(serverSocketFD, 10);
 
-    log("Waiting for connections on " + std::string(ip) + ":2956");
+    log("Waiting for connections on " + std::string(ip) + ":" + std::to_string(SERVER_PORT));
 
     int clientSocketFD = accept(serverSocketFD, nullptr, nullptr);
 

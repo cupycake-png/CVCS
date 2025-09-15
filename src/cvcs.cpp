@@ -8,23 +8,12 @@
 #include <set>
 #include <unordered_map>
 
-// #include <sys/socket.h>
-// #include <netinet/in.h>
-// #include <arpa/inet.h>
-
 #include "md5.h"
 #include "networkUtils.h"
 #include "utils.h"
 
-// Potentially necessary for cross platform compatibility
-#ifdef _WIN32
-    #include <windows.h>
-#endif
-
 #define SERVER_IP "192.168.160.128"
 #define SERVER_PORT 2956
-
-// TODO: add status to help message
 
 // General logging functions
 template <typename T>
@@ -615,11 +604,11 @@ int main(int argc, char* argv[]){
     }
 
     if(argc <= 1){
-        error("Not enough arguments passed. Usage:\ncvcs init <directory>\ncvcs save <message>?\ncvcs add <filename>\ncvcs ignore <filename>\ncvcs rollback <saveID>\ncvcs obliterate <saveID>\ncvcs history\ncvcs upload <filenames>? @<message>@?\ncvcs download <projectname?>");
+        error("Not enough arguments passed. Usage:\ncvcs init <directory>\ncvcs save <message>?\ncvcs add <filename>\ncvcs ignore <filename>\ncvcs rollback <saveID>\ncvcs obliterate <saveID>\ncvcs history\ncvcs status\ncvcs upload <filenames>? @<message>@?\ncvcs download <projectname?>");
         return -1;
 
     }else if(std::string(argv[1]) == "help"){
-        log("Usage:\ncvcs init <directory>\ncvcs save <message>?\ncvcs add <filename>\ncvcs ignore <filename>\ncvcs rollback <saveID>\ncvcs obliterate <saveID>\ncvcs history\ncvcs upload <filenames>? @<message>@?\ncvcs download <projectname?>");
+        log("Usage:\ncvcs init <directory>\ncvcs save <message>?\ncvcs add <filename>\ncvcs ignore <filename>\ncvcs rollback <saveID>\ncvcs obliterate <saveID>\ncvcs history\ncvcs status\ncvcs upload <filenames>? @<message>@?\ncvcs download <projectname?>");
 
     }else if(std::string(argv[1]) == "history" && argc == 2){
         // View history
@@ -657,10 +646,12 @@ int main(int argc, char* argv[]){
 
             std::string dateTime = "";
             std::string message = "";
+            
             int saveID = 0;
 
             std::getline(saveFile, dateTime);
             std::getline(saveFile, message);
+
             saveID = std::stoi(saveDir.path().filename().string());
 
             saveFile.close();
@@ -1095,7 +1086,7 @@ int main(int argc, char* argv[]){
         return 0;
 
     }else{
-        error("Invalid arguments passed. Usage:\ncvcs init <directory>\ncvcs save <message>?\ncvcs add <filename>\ncvcs ignore <filename>\ncvcs rollback <saveID>\ncvcs obliterate <saveID>\ncvcs history\ncvcs upload <filenames>? @<message>@?\ncvcs download <projectname?>");
+        error("Invalid arguments passed. Usage:\ncvcs init <directory>\ncvcs save <message>?\ncvcs add <filename>\ncvcs ignore <filename>\ncvcs rollback <saveID>\ncvcs obliterate <saveID>\ncvcs history\ncvcs status\ncvcs upload <filenames>? @<message>@?\ncvcs download <projectname?>");
         return -2;
     }
 
